@@ -1,0 +1,22 @@
+node_modules/
+dist/
+build/
+.DS_Store
+*.log
+npm-debug.log*
+
+# env
+.env
+.env.local
+.env.*.local
+
+# server data & uploads
+server/data/
+server/uploads/
+*.sqlite
+*.sqlite3
+*.db
+
+# editor
+.vscode/
+.idea/
