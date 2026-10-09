@@ -10,13 +10,14 @@ npm-debug.log*
 .env.local
 .env.*.local
 
-# server data & uploads
-server/data/
-server/uploads/
-*.sqlite
-*.sqlite3
-*.db
 
 # editor
 .vscode/
 .idea/
+
+# PHP backend
+backend/vendor/
+backend/.env
+backend/data/*.sqlite
+backend/storage/uploads/*
+!backend/storage/uploads/.gitkeep
