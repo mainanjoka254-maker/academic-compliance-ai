@@ -1,99 +1,70 @@
-# ComplyAI — AI-Driven Academic Compliance System
+# ComplyAI — AI Academic Compliance System (React + PHP)
 
-A full-stack platform that lets institutions upload academic documents (syllabi, exams,
-policies, accreditation reports) and instantly score them against compliance rules with an
-AI analysis engine. Includes authentication, real data persistence, file uploads, dashboards,
-a creative subscription/billing experience, and a contact section.
-
-Built with **React + TypeScript + Tailwind CSS** (client) and **Node.js + Express + SQLite**
-(server). The layout (sidebar + header) is implemented in
-[`client/src/components/Layout.tsx`](client/src/components/Layout.tsx).
-
-## Features
-
-- **Authentication** — register, sign in, JWT sessions, protected routes, profile settings.
-- **Document uploads** — drag & drop, real multipart upload, stored on disk, metadata in SQLite.
-- **AI compliance engine** — every upload is scored, classified, and summarised
-  ([`server/src/analyzer.ts`](server/src/analyzer.ts) — pluggable for a real LLM later).
-- **Live dashboard** — totals, average score trend, category breakdown, recent documents
-  (charts via Recharts).
-- **Subscription** — creative, professional pricing page with monthly/yearly billing toggle.
-- **Contact** — working contact form (persisted) with phone `0140844495` and email
-  `mainanjoka254@gmail.com`.
-- **Responsive design** — collapsible sidebar, mobile-friendly layouts, clean indigo theme.
-
-## Project structure
+React + TypeScript + Tailwind **frontend** (`client/`) talking to a **PHP 8.1+ REST API** (`backend/`).
+The API implements exactly the endpoints the React app already calls, so the frontend needed no changes.
 
 ```
-ai-academic-compliance-system/
-├── client/                 # React + TS + Tailwind (Vite)
-│   └── src/
-│       ├── components/      # Layout, Sidebar, Header, AuthShell, ui/
-│       ├── context/         # AuthContext
-│       ├── lib/             # api client, types, constants, formatters
-│       └── pages/           # Landing, Login, Register, Dashboard, Documents,
-│                            # Upload, Subscription, Contact, Settings, NotFound
-└── server/                 # Express + better-sqlite3 API
-    └── src/
-        ├── routes/          # auth, documents, dashboard, misc (contact/subscription)
-        ├── analyzer.ts      # compliance scoring engine
-        ├── auth.ts          # JWT middleware
-        └── db.ts            # SQLite schema + demo seed
+client/                 React + Vite  (http://localhost:5173)
+backend/
+  public/index.php      front controller + routes   (API on http://127.0.0.1:4000)
+  src/Core/             Router, Request, Response, JWT, Auth, Database, Env
+  src/Controllers/      Auth, Document, Dashboard, Misc (contact + subscription)
+  src/Services/         AIComplianceService (cURL API), TextExtractor, ComplianceAnalyzer
+  database/schema.sql   MySQL schema
+  bin/migrate.php       creates tables + demo account (SQLite or MySQL)
+postman/                Postman collection
 ```
 
-## Getting started
+## Run it
 
-Requires Node.js 18+.
+Requirements: **Node 18+**, **PHP 8.1+** (extensions: pdo_sqlite or pdo_mysql, curl, mbstring, zip), Composer.
 
 ```bash
-# install all workspaces
+# 1. frontend deps
 npm install
 
-# configure the server (optional but recommended)
-cp server/.env.example server/.env   # set JWT_SECRET
+# 2. backend setup
+cd backend
+cp .env.example .env          # set JWT_SECRET
+composer install              # adds PDF text extraction (smalot/pdfparser)
+cd ..
+npm run db:migrate            # creates DB + demo user
 
-# run client + server together
+# 3. start API (:4000) and client (:5173) together
 npm run dev
 ```
 
-- Client: http://localhost:5173
-- API: http://localhost:4000 (the Vite dev server proxies `/api` to it)
+Open http://localhost:5173 and sign in with **demo@complyai.io / demo1234**.
 
-### Demo account
+### Use MySQL instead of SQLite
+In `backend/.env` set `DB_DRIVER=mysql` plus `DB_HOST / DB_NAME / DB_USER / DB_PASS`, then run `npm run db:migrate`
+(or import `backend/database/schema.sql` yourself).
 
-A demo account is seeded automatically with sample documents:
+### Turn on the real AI / plagiarism check
+Set `AI_API_URL` and `AI_API_KEY` in `backend/.env`. The API must accept
+`{ text, features }` and return `{ ai_percentage, similarity_percentage, word_count }`.
+Thresholds (in `AIComplianceService`): AI > 25 % or similarity > 20 % → non-compliant; > 10 % → needs review.
+Without keys, uploads are still scored by the structural rubric in `ComplianceAnalyzer`
+(required sections + minimum length).
 
-- **Email:** `demo@complyai.io`
-- **Password:** `demo1234`
+## API
 
-Or click **"Try the live demo account"** on the login page.
+| Method | Path | Auth |
+|---|---|---|
+| GET | `/api/health` | – |
+| POST | `/api/auth/register`, `/api/auth/login` | – |
+| GET / PATCH | `/api/auth/me` | ✔ |
+| GET / POST | `/api/documents` (POST = multipart: `file`, `title`, `category`) | ✔ |
+| GET / DELETE | `/api/documents/{id}` | ✔ |
+| GET | `/api/dashboard` | ✔ |
+| POST | `/api/contact` | optional |
+| POST | `/api/subscription` | ✔ |
 
-## Scripts
+Auth is `Authorization: Bearer <JWT>` (HS256, 7 days). Import `postman/ComplyAI-PHP.postman_collection.json` to test.
 
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Run client + server concurrently |
-| `npm run build` | Build server (tsc) and client (vite) |
-| `npm run lint` | Lint the client |
-| `npm start` | Start the built server |
-
-## API overview
-
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `POST` | `/api/auth/register` | Create account |
-| `POST` | `/api/auth/login` | Sign in |
-| `GET` | `/api/auth/me` | Current user |
-| `PATCH` | `/api/auth/me` | Update profile |
-| `GET` | `/api/documents` | List documents |
-| `POST` | `/api/documents` | Upload + analyse a document |
-| `DELETE` | `/api/documents/:id` | Delete a document |
-| `GET` | `/api/dashboard` | Aggregated stats |
-| `POST` | `/api/subscription` | Change plan |
-| `POST` | `/api/contact` | Submit a contact message |
-
-## Replacing the AI engine
-
-`server/src/analyzer.ts` exposes a single `analyzeDocument()` function returning a status,
-score, issue count, and summary. Swap its body for a call to your preferred LLM / ML service
-to plug in real document understanding — the rest of the app stays unchanged.
+## Notes
+- Uploads are stored in `backend/storage/uploads/` (outside the web root). Limit 20 MB — `npm run dev` already passes the PHP limits;
+  under XAMPP/Apache raise `upload_max_filesize` / `post_max_size` in `php.ini`.
+- On Apache/XAMPP, point the vhost at `backend/public` (the `.htaccess` is included) and set the client's `VITE_API_URL`
+  to that URL + `/api`.
+- Scanned (image-only) PDFs have no extractable text and fall back to an estimated score.
